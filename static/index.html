@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>无线网络干扰小区周报全自动采集与分析平台</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --secondary: #64748b;
+      --bg-main: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Nav */
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: #1e3a8a;
+    }
+
+    .brand i {
+      font-size: 1.4rem;
+      color: var(--primary);
+    }
+
+    .auth-status-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: #f1f5f9;
+      color: var(--text-muted);
+    }
+
+    .status-badge.online {
+      background: #ecfdf5;
+      color: #047857;
+    }
+
+    .status-badge.online::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    .status-badge.offline::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1280px;
+      width: 100%;
+      margin: 24px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 960px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #334155;
+    }
+
+    .card-title i {
+      color: var(--primary);
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background: #fff;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .date-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .checkbox-group {
+      display: flex;
+      gap: 16px;
+      margin-top: 4px;
+    }
+
+    .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.88rem;
+      cursor: pointer;
+    }
+
+    .city-summary-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 16px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    .btn-danger {
+      background: #fee2e2;
+      color: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: #fecaca;
+    }
+
+    .btn-full {
+      width: 100%;
+    }
+
+    /* Progress & Status */
+    .progress-box {
+      margin-bottom: 16px;
+    }
+
+    .progress-bar-bg {
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* Log Console */
+    .log-console {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      padding: 12px;
+      height: 380px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    .log-line {
+      margin-bottom: 4px;
+    }
+
+    .log-line.warn { color: #fbbf24; }
+    .log-line.err { color: #f87171; }
+    .log-line.ok { color: #4ade80; }
+
+    /* Report List */
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .report-table th, .report-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .report-table th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .report-table tr:hover {
+      background: #f1f5f9;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+
+    .modal-overlay.active {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .modal-card {
+      background: #ffffff;
+      border-radius: var(--radius);
+      width: 440px;
+      max-width: 92vw;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .captcha-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .captcha-img {
+      height: 42px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部导航 -->
+  <header>
+    <div class="brand">
+      <i class="fa-solid fa-tower-cell"></i>
+      <span>无线干扰小区周报 · 智能采集系统</span>
+    </div>
+    <div class="auth-status-bar">
+      <div id="authBadge" class="status-badge offline">未登录</div>
+      <button id="authBtn" class="btn btn-secondary" onclick="openLoginModal()">
+        <i class="fa-solid fa-key"></i> <span id="authBtnText">账号登录</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 主体工作区 -->
+  <main>
+    <!-- 左侧：参数配置与控制 -->
+    <section>
+      <div class="card">
+        <div class="card-title">
+          <i class="fa-solid fa-sliders"></i>
+          <span>周报与采集参数设置</span>
+        </div>
+
+        <div class="form-group">
+          <label><i class="fa-regular fa-calendar"></i> 采集统计周区间 (7天)：</label>
+          <div class="date-row">
+            <input type="date" id="startDate">
+            <input type="date" id="endDate">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label><i class="fa-solid fa-signal"></i> 制式选择：</label>
+          <div class="checkbox-group">
+            <label class="checkbox-label"><input type="checkbox" id="sys4G" checked> 4G干扰</label>
+            <label class="checkbox-label"><input type="checkbox" id="sys5G" checked> 5G干扰</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label><i class="fa-solid fa-network-wired"></i> 并发采集线程数：</label>
+          <select id="workerCount">
+            <option value="2">2 线程 (稳定轻量)</option>
+            <option value="4" selected>4 线程 (推荐)</option>
+            <option value="6">6 线程 (高速)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label><i class="fa-solid fa-arrows-rotate"></i> 采集覆盖模式：</label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="forceDownload"> 强制重新下载覆盖已有文件
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label><i class="fa-solid fa-map-location-dot"></i> 覆盖范围说明：</label>
+          <div class="city-summary-box">
+            包含全省21地市：一类（广州/深圳/东莞/佛山）、二类（惠州/珠海/中山/汕头/湛江/江门/茂名/揭阳）、三类（清远/肇庆/梅州/韶关/河源/潮州/阳江/汕尾/云浮）。<br>
+            周报算法自动输出：阳江明细、区域分布、全省排名双Sheet（干扰电平判断 & 干扰小区标识判断）。
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+          <button id="startBtn" class="btn btn-primary btn-full" onclick="startCollectAndReport()">
+            <i class="fa-solid fa-play"></i> 开始自动采集并输出周报
+          </button>
+          <button id="generateOnlyBtn" class="btn btn-secondary btn-full" onclick="generateReportOnly()">
+            <i class="fa-solid fa-file-excel"></i> 仅重新生成周报 (使用已有源文件)
+          </button>
+          <button id="cancelBtn" class="btn btn-danger btn-full" onclick="cancelJob()" style="display:none;">
+            <i class="fa-solid fa-stop"></i> 终止当前任务
+          </button>
+        </div>
+      </div>
+
+      <!-- 快速结果卡片 -->
+      <div class="card" id="resultCard" style="display: none;">
+        <div class="card-title" style="color: #059669;">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>周报已生成就绪</span>
+        </div>
+        <p id="resultFileName" style="font-size: 0.85rem; word-break: break-all; margin-bottom: 12px;"></p>
+        <button id="downloadResultBtn" class="btn btn-primary btn-full" onclick="downloadLatestResult()">
+          <i class="fa-solid fa-download"></i> 立即下载 Excel 周报
+        </button>
+      </div>
+    </section>
+
+    <!-- 右侧：进度、实时控制台与历史报表 -->
+    <section>
+      <div class="card">
+        <div class="card-title">
+          <i class="fa-solid fa-gauge-high"></i>
+          <span>执行进度与实时状态</span>
+        </div>
+
+        <div class="progress-box">
+          <div class="progress-bar-bg">
+            <div id="progressFill" class="progress-bar-fill"></div>
+          </div>
+          <div class="progress-info">
+            <span id="progressStep">就绪</span>
+            <span id="progressText">0%</span>
+          </div>
+        </div>
+
+        <div class="card-title" style="margin-top: 20px;">
+          <i class="fa-solid fa-terminal"></i>
+          <span>实时处理日志</span>
+        </div>
+        <div id="logConsole" class="log-console">
+          <div class="log-line">无线干扰小区周报全自动采集与分析系统已启动。</div>
+        </div>
+      </div>
+
+      <!-- 历史报表下载列表 -->
+      <div class="card">
+        <div class="card-title">
+          <i class="fa-solid fa-folder-open"></i>
+          <span>生成报表历史文件库</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>报表文件名</th>
+                <th>文件大小</th>
+                <th>生成时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="reportTableBody">
+              <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">正在加载报表列表...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 登录弹窗 (含CAS RSA加密、图形验证码与短信验证) -->
+  <div id="loginModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title"><i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> 统一身份安全认证</div>
+        <i class="fa-solid fa-xmark" style="cursor: pointer; color: var(--text-muted);" onclick="closeLoginModal()"></i>
+      </div>
+
+      <!-- 步骤 1：账号与密码 -->
+      <div id="stepAccount">
+        <div class="form-group">
+          <label>大数据平台账号：</label>
+          <input type="text" id="loginUser" placeholder="请输入4A/NQI统一认证账号">
+        </div>
+        <div class="form-group">
+          <label>账号密码：</label>
+          <input type="password" id="loginPwd" placeholder="输入平台登录密码">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="submitBeginLogin()">
+          下一步：获取安全验证码 <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+
+      <!-- 步骤 2：图形验证码 -->
+      <div id="stepCaptcha" style="display: none;">
+        <div class="form-group">
+          <label>请输入图形验证码 (点击图片可刷新)：</label>
+          <div class="captcha-container">
+            <input type="text" id="captchaInput" placeholder="4位字符" maxlength="6" style="flex: 1;">
+            <img id="captchaImg" class="captcha-img" src="" title="点击刷新验证码" onclick="refreshCaptcha()">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="submitCaptcha()">
+          验证图形码并发送短信 <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+
+      <!-- 步骤 3：短信验证码 -->
+      <div id="stepSms" style="display: none;">
+        <div class="form-group">
+          <label>请输入手机收到的短信验证码：</label>
+          <input type="text" id="smsInput" placeholder="短信验证码" maxlength="8">
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" style="flex: 1;" onclick="resendSms()">
+            重新发送短信
+          </button>
+          <button class="btn btn-primary" style="flex: 1;" onclick="submitSms()">
+            完成登录 <i class="fa-solid fa-check"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="loginMsg" style="margin-top: 14px; font-size: 0.85rem; color: var(--danger); text-align: center;"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentLoginId = null;
+    let pollInterval = null;
+    let latestResultFileName = null;
+
+    // 初始化页面默认日期（最近一周周一到周日）
+    window.addEventListener('DOMContentLoaded', () => {
+      initWeekDates();
+      checkAuthStatus();
+      loadReports();
+    });
+
+    function initWeekDates() {
+      const now = new Date();
+      // 获取上一周或者本周初
+      const day = now.getDay() || 7; // 1-7
+      const sunday = new Date(now);
+      sunday.setDate(now.getDate() - day);
+      const monday = new Date(sunday);
+      monday.setDate(sunday.getDate() - 6);
+
+      document.getElementById('startDate').value = formatDate(monday);
+      document.getElementById('endDate').value = formatDate(sunday);
+    }
+
+    function formatDate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    async function checkAuthStatus() {
+      try {
+        const res = await fetch('/api/auth/status');
+        const data = await res.json();
+        const badge = document.getElementById('authBadge');
+        const btnText = document.getElementById('authBtnText');
+        const authBtn = document.getElementById('authBtn');
+
+        if (data.logged_in) {
+          badge.className = 'status-badge online';
+          badge.textContent = `已在线 (${data.username})`;
+          btnText.textContent = '切换账号';
+          authBtn.className = 'btn btn-secondary';
+        } else {
+          badge.className = 'status-badge offline';
+          badge.textContent = '未登录';
+          btnText.textContent = '账号登录';
+          authBtn.className = 'btn btn-primary';
+        }
+      } catch (e) {
+        console.error("检查认证状态异常:", e);
+      }
+    }
+
+    function openLoginModal() {
+      document.getElementById('stepAccount').style.display = 'block';
+      document.getElementById('stepCaptcha').style.display = 'none';
+      document.getElementById('stepSms').style.display = 'none';
+      document.getElementById('loginMsg').textContent = '';
+      document.getElementById('loginModal').classList.add('active');
+    }
+
+    function closeLoginModal() {
+      document.getElementById('loginModal').classList.remove('active');
+    }
+
+    async function submitBeginLogin() {
+      const username = document.getElementById('loginUser').value.trim();
+      const password = document.getElementById('loginPwd').value.trim();
+      const msgEl = document.getElementById('loginMsg');
+      msgEl.style.color = '#2563eb';
+      msgEl.textContent = '正在连接认证网关获取验证码...';
+
+      try {
+        const res = await fetch('/api/auth/begin', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentLoginId = data.login_id;
+          document.getElementById('captchaImg').src = data.captcha_base64;
+          document.getElementById('stepAccount').style.display = 'none';
+          document.getElementById('stepCaptcha').style.display = 'block';
+          msgEl.textContent = '';
+          document.getElementById('captchaInput').focus();
+        } else {
+          msgEl.style.color = 'var(--danger)';
+          msgEl.textContent = data.message || '初始化登录失败';
+        }
+      } catch (e) {
+        msgEl.style.color = 'var(--danger)';
+        msgEl.textContent = '网络请求异常: ' + e.message;
+      }
+    }
+
+    async function refreshCaptcha() {
+      if (!currentLoginId) return;
+      try {
+        const res = await fetch('/api/auth/refresh-captcha', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ login_id: currentLoginId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('captchaImg').src = data.captcha_base64;
+          document.getElementById('captchaInput').value = '';
+        }
+      } catch (e) {
+        console.error("刷新验证码异常:", e);
+      }
+    }
+
+    async function submitCaptcha() {
+      const code = document.getElementById('captchaInput').value.trim();
+      const msgEl = document.getElementById('loginMsg');
+      if (!code) {
+        msgEl.style.color = 'var(--danger)';
+        msgEl.textContent = '请输入图形验证码';
+        return;
+      }
+      msgEl.style.color = '#2563eb';
+      msgEl.textContent = '正在校验图形验证码...';
+
+      try {
+        const res = await fetch('/api/auth/submit-captcha', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ login_id: currentLoginId, captcha_code: code })
+        });
+        const data = await res.json();
+        if (data.success) {
+          msgEl.textContent = '图形验证通过，正在发送短信...';
+          await resendSms();
+        } else {
+          msgEl.style.color = 'var(--danger)';
+          msgEl.textContent = data.message || '图形验证码错误';
+          refreshCaptcha();
+        }
+      } catch (e) {
+        msgEl.style.color = 'var(--danger)';
+        msgEl.textContent = '网络错误: ' + e.message;
+      }
+    }
+
+    async function resendSms() {
+      const msgEl = document.getElementById('loginMsg');
+      try {
+        const res = await fetch('/api/auth/send-sms', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ login_id: currentLoginId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('stepCaptcha').style.display = 'none';
+          document.getElementById('stepSms').style.display = 'block';
+          msgEl.style.color = 'var(--success)';
+          msgEl.textContent = data.message;
+          document.getElementById('smsInput').focus();
+        } else {
+          msgEl.style.color = 'var(--danger)';
+          msgEl.textContent = data.message || '短信发送失败';
+        }
+      } catch (e) {
+        msgEl.style.color = 'var(--danger)';
+        msgEl.textContent = '网络错误: ' + e.message;
+      }
+    }
+
+    async function submitSms() {
+      const code = document.getElementById('smsInput').value.trim();
+      const msgEl = document.getElementById('loginMsg');
+      if (!code) {
+        msgEl.style.color = 'var(--danger)';
+        msgEl.textContent = '请输入短信验证码';
+        return;
+      }
+      msgEl.style.color = '#2563eb';
+      msgEl.textContent = '正在验证登录凭据...';
+
+      try {
+        const res = await fetch('/api/auth/submit-sms', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ login_id: currentLoginId, sms_code: code })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeLoginModal();
+          checkAuthStatus();
+          alert('登录成功！已保存认证会话。');
+        } else {
+          msgEl.style.color = 'var(--danger)';
+          msgEl.textContent = data.message || '短信验证码错误';
+        }
+      } catch (e) {
+        msgEl.style.color = 'var(--danger)';
+        msgEl.textContent = '网络错误: ' + e.message;
+      }
+    }
+
+    // 任务操作
+    async function startCollectAndReport() {
+      const sDate = document.getElementById('startDate').value;
+      const eDate = document.getElementById('endDate').value;
+      if (!sDate || !eDate) {
+        alert('请选择完整统计起止日期！');
+        return;
+      }
+
+      const systems = [];
+      if (document.getElementById('sys4G').checked) systems.push('4G');
+      if (document.getElementById('sys5G').checked) systems.push('5G');
+      if (systems.length === 0) {
+        alert('请至少勾选一种网络制式(4G/5G)');
+        return;
+      }
+
+      const forceDownload = document.getElementById('forceDownload').checked;
+      const maxWorkers = parseInt(document.getElementById('workerCount').value) || 4;
+
+      try {
+        const res = await fetch('/api/job/start', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            start_date: sDate,
+            end_date: eDate,
+            systems: systems,
+            force_download: forceDownload,
+            max_workers: maxWorkers
+          })
+        });
+
+        if (res.status === 401) {
+          alert('需要登录认证后方可采集数据，请点击右上角登录');
+          openLoginModal();
+          return;
+        }
+
+        const data = await res.json();
+        if (!data.success) {
+          alert(data.detail || data.message || '启动任务失败');
+          return;
+        }
+
+        setJobUIState(true);
+        startPolling();
+      } catch (e) {
+        alert('请求失败: ' + e.message);
+      }
+    }
+
+    async function generateReportOnly() {
+      const sDate = document.getElementById('startDate').value;
+      const eDate = document.getElementById('endDate').value;
+      if (!sDate || !eDate) {
+        alert('请选择完整统计起止日期！');
+        return;
+      }
+
+      const consoleEl = document.getElementById('logConsole');
+      consoleEl.innerHTML += `<div class="log-line ok">[INFO] 开始直接生成周报 (${sDate} ~ ${eDate})...</div>`;
+
+      try {
+        const res = await fetch('/api/job/generate-only', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ start_date: sDate, end_date: eDate })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (data.logs) {
+            data.logs.forEach(l => {
+              consoleEl.innerHTML += `<div class="log-line">${l}</div>`;
+            });
+          }
+          consoleEl.scrollTop = consoleEl.scrollHeight;
+          latestResultFileName = data.result_filename;
+          showResultCard(data.result_filename);
+          loadReports();
+        } else {
+          alert('生成失败: ' + data.message);
+        }
+      } catch (e) {
+        alert('执行异常: ' + e.message);
+      }
+    }
+
+    async function cancelJob() {
+      try {
+        await fetch('/api/job/cancel', { method: 'POST' });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function setJobUIState(running) {
+      document.getElementById('startBtn').style.display = running ? 'none' : 'block';
+      document.getElementById('generateOnlyBtn').style.display = running ? 'none' : 'block';
+      document.getElementById('cancelBtn').style.display = running ? 'block' : 'none';
+    }
+
+    function startPolling() {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(pollStatus, 1500);
+      pollStatus();
+    }
+
+    async function pollStatus() {
+      try {
+        const res = await fetch('/api/job/status');
+        const data = await res.json();
+
+        // 进度与状态
+        document.getElementById('progressFill').style.width = `${data.progress}%`;
+        document.getElementById('progressText').textContent = `${data.progress}%`;
+        document.getElementById('progressStep').textContent = data.current_step || '处理中...';
+
+        // 日志
+        const consoleEl = document.getElementById('logConsole');
+        if (data.logs && data.logs.length > 0) {
+          consoleEl.innerHTML = data.logs.map(l => {
+            let cls = 'log-line';
+            if (l.includes('WARN')) cls += ' warn';
+            if (l.includes('ERROR') || l.includes('FATAL')) cls += ' err';
+            if (l.includes('完成') || l.includes('成功')) cls += ' ok';
+            return `<div class="${cls}">${l}</div>`;
+          }).join('');
+          consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        if (data.status === 'completed') {
+          clearInterval(pollInterval);
+          setJobUIState(false);
+          latestResultFileName = data.result_filename;
+          showResultCard(data.result_filename);
+          loadReports();
+        } else if (data.status === 'failed' || data.status === 'cancelled') {
+          clearInterval(pollInterval);
+          setJobUIState(false);
+        }
+      } catch (e) {
+        console.error("轮询异常:", e);
+      }
+    }
+
+    function showResultCard(filename) {
+      const card = document.getElementById('resultCard');
+      document.getElementById('resultFileName').textContent = `报表已存为: ${filename}`;
+      card.style.display = 'block';
+    }
+
+    function downloadLatestResult() {
+      if (latestResultFileName) {
+        window.open(`/api/reports/download/${encodeURIComponent(latestResultFileName)}`, '_blank');
+      }
+    }
+
+    async function loadReports() {
+      try {
+        const res = await fetch('/api/reports/list');
+        const data = await res.json();
+        const tbody = document.getElementById('reportTableBody');
+        if (!data.reports || data.reports.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">暂无生成报表</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.reports.map(r => `
+          <tr>
+            <td style="font-weight: 500;">${r.filename}</td>
+            <td>${r.size_kb} KB</td>
+            <td>${r.created_at}</td>
+            <td>
+              <a href="/api/reports/download/${encodeURIComponent(r.filename)}" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.78rem;">
+                <i class="fa-solid fa-download"></i> 下载
+              </a>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error("加载报表列表异常:", e);
+      }
+    }
+  </script>
+</body>
+</html>
