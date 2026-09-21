@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.config import (
-    DEFAULT_USERNAME, DEFAULT_PASSWORD, BASE_DIR, REPORT_DIR,
+    DEFAULT_USERNAME, DEFAULT_PASSWORD, BASE_DIR, STATIC_DIR, REPORT_DIR,
     SOURCE_4G_DIR, SOURCE_5G_DIR, ALL_CITIES
 )
 from core.auth import WebLoginManager
@@ -48,7 +48,7 @@ app.add_middleware(
 )
 
 # 静态资源挂载
-static_dir = os.path.join(BASE_DIR, "static")
+static_dir = STATIC_DIR
 os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -157,11 +157,11 @@ def get_auth_status():
     with _session_lock:
         if _current_session is not None:
             return {"logged_in": True, "username": _current_user, "message": "在线"}
-        # 尝试复用本地 Cookie
-        ok, sess, msg = WebLoginManager.check_saved_session(DEFAULT_USERNAME)
+        # 尝试复用本地 Cookie：未显式配置用户名时，自动扫描 cookies 目录
+        ok, sess, msg, username = WebLoginManager.check_saved_session(DEFAULT_USERNAME or None)
         if ok:
             _current_session = sess
-            _current_user = DEFAULT_USERNAME
+            _current_user = username
             return {"logged_in": True, "username": _current_user, "message": msg}
         return {"logged_in": False, "username": None, "message": "未登录或Cookie已失效"}
 

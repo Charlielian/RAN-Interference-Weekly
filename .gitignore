@@ -30,6 +30,11 @@ env/
 .venv/
 .env
 
+# PyInstaller build outputs
+build/
+dist/
+*.spec.bak
+
 # Editor settings
 .vscode/
 .idea/

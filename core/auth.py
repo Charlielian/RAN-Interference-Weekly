@@ -3,6 +3,7 @@
 Web端登录状态机
 支持图形验证码获取、刷新、提交以及短信验证码发送与提交，支持Cookie持久化与复用
 """
+import os
 import json
 import time
 import base64
@@ -15,10 +16,11 @@ from lxml import etree
 
 from backend.config import (
     NQI_BASE_URL, LOGIN_URL, CAPTCHA_URL, GET_CONFIG_URL, SEND_CODE_URL,
-    HEADERS, HEADERS_JSON, DEFAULT_USERNAME, DEFAULT_PASSWORD
+    HEADERS, HEADERS_JSON, HEADERS_HTML, DEFAULT_USERNAME, DEFAULT_PASSWORD,
+    COOKIE_DIR
 )
 from utils.crypto import rsa_encrypt
-from utils.helpers import save_cookie, load_cookie, delete_cookie
+from utils.helpers import save_cookie, load_cookie, delete_cookie, HttpCookieEncoder
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logger = logging.getLogger(__name__)
@@ -58,30 +60,63 @@ def _gc_web_login_contexts():
 
 class WebLoginManager:
     @staticmethod
-    def check_saved_session(username: str):
-        """检查保存的Cookie是否仍然有效"""
-        saved_cookie = load_cookie(username)
-        if not saved_cookie:
-            return False, None, "未找到保存的Cookie凭证"
-        
+    def _try_cookie_file(cookie_path: str, expected_user: str = None):
+        """加载单个 cookie 文件并校验是否有效，返回 (ok, sess, username)"""
+        username = os.path.splitext(os.path.basename(cookie_path))[0]
+        try:
+            with open(cookie_path, 'r', encoding='utf-8') as f:
+                saved_cookie = HttpCookieEncoder.decode(f.read())
+        except Exception:
+            return False, None, None
+        if not saved_cookie or len(list(saved_cookie)) == 0:
+            return False, None, None
+
         sess = requests.Session()
         sess.verify = False
         sess.cookies = saved_cookie
-        
+
         try:
             url = f'{NQI_BASE_URL}/pro-wfm-biz-server/cas/login/info'
             res = sess.get(url, headers=HEADERS, timeout=TIMEOUT_SHORT)
             if res.status_code == 200:
-                try:
-                    data = json.loads(res.text)
-                    if isinstance(data, dict) and data.get('data', {}).get('loginId') == username:
-                        return True, sess, "Cookie验证有效，自动登录成功"
-                except Exception:
-                    pass
+                data = json.loads(res.text)
+                login_id = data.get('data', {}).get('loginId') if isinstance(data, dict) else None
+                if login_id and (expected_user is None or login_id == expected_user):
+                    return True, sess, login_id
         except Exception as e:
-            logger.warning(f"检查保存Cookie失败: {e}")
-        
-        return False, None, "保存的Cookie已失效，请重新登录"
+            logger.warning(f"校验Cookie文件 {os.path.basename(cookie_path)} 失败: {e}")
+
+        return False, None, None
+
+    @staticmethod
+    def check_saved_session(username: str = None):
+        """检查保存的Cookie是否仍然有效。
+
+        username 为空时自动扫描 cookies 目录下的所有 .json 文件，
+        返回第一个通过服务端校验的会话。返回 (ok, sess, msg, username)。
+        """
+        candidates = []
+        if username:
+            path = os.path.join(COOKIE_DIR, f"{username}.json")
+            if os.path.exists(path):
+                candidates.append(path)
+        else:
+            try:
+                names = [f for f in os.listdir(COOKIE_DIR) if f.endswith('.json')]
+                names.sort(key=lambda f: os.path.getmtime(os.path.join(COOKIE_DIR, f)), reverse=True)
+                candidates = [os.path.join(COOKIE_DIR, f) for f in names]
+            except Exception:
+                candidates = []
+
+        if not candidates:
+            return False, None, "未找到保存的Cookie凭证", None
+
+        for path in candidates:
+            ok, sess, login_id = WebLoginManager._try_cookie_file(path, expected_user=username)
+            if ok:
+                return True, sess, "Cookie验证有效，自动登录成功", login_id
+
+        return False, None, "保存的Cookie已失效，请重新登录", None
 
     @staticmethod
     def begin(username: str = None, password: str = None) -> dict:
@@ -92,7 +127,7 @@ class WebLoginManager:
         ctx = _LoginContext(login_id, user, pwd)
 
         try:
-            res = ctx.sess.get(LOGIN_URL, headers=HEADERS, timeout=TIMEOUT_SHORT)
+            res = ctx.sess.get(LOGIN_URL, headers=HEADERS_HTML, timeout=TIMEOUT_SHORT)
             res.encoding = 'utf-8'
             html = etree.HTML(res.text)
 
@@ -116,7 +151,7 @@ class WebLoginManager:
             ctx.username_e = rsa_encrypt(ctx.username, ctx.public_key)
             ctx.password_e = rsa_encrypt(ctx.password, ctx.public_key)
 
-            captcha_res = ctx.sess.get(CAPTCHA_URL, timeout=TIMEOUT_SHORT)
+            captcha_res = ctx.sess.get(CAPTCHA_URL, headers=HEADERS_HTML, timeout=TIMEOUT_SHORT)
             if captcha_res.status_code != 200 or len(captcha_res.content) < 100:
                 return {"login_id": login_id, "captcha_base64": "", "success": False, "message": f"获取验证码失败（HTTP {captcha_res.status_code}）"}
             
@@ -149,7 +184,7 @@ class WebLoginManager:
         if ctx is None:
             return {"success": False, "message": "登录会话已过期，请重新登录", "captcha_base64": ""}
         try:
-            captcha_res = ctx.sess.get(CAPTCHA_URL, timeout=TIMEOUT_SHORT)
+            captcha_res = ctx.sess.get(CAPTCHA_URL, headers=HEADERS_HTML, timeout=TIMEOUT_SHORT)
             if captcha_res.status_code != 200:
                 return {"success": False, "message": f"获取验证码失败（HTTP {captcha_res.status_code}）", "captcha_base64": ""}
             ctx.captcha_bytes = captcha_res.content
@@ -236,7 +271,7 @@ class WebLoginManager:
                 '_eventId': 'submit',
                 'geolocation': ''
             }
-            res_login = ctx.sess.post(LOGIN_URL, data=login_data, headers=HEADERS, timeout=TIMEOUT_MEDIUM)
+            res_login = ctx.sess.post(LOGIN_URL, data=login_data, headers=HEADERS_HTML, timeout=TIMEOUT_MEDIUM)
 
             if ctx.sess.cookies.get('CASTGC'):
                 ctx.logged_in = True

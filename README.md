@@ -29,7 +29,23 @@
 
 ## 启动方式
 
+### 方式一：Python 脚本运行
+
 ```bash
+pip install -r requirements.txt
 python3 run.py
 ```
-启动后在浏览器打开：`http://127.0.0.1:8090` 即可使用。
+启动后程序会自动打开浏览器访问：`http://127.0.0.1:8090`。
+
+### 方式二：Windows 独立可执行文件（EXE）
+
+项目已配置 GitHub Actions 自动构建工作流：
+- 每次向 `main` 分支提交或推送 `v*` 标签时，GitHub 会自动编译生成单文件版 Windows `.exe`。
+- 可直接在 GitHub 仓库的 **Actions** -> **Artifacts** 处下载 `干扰小区周报全自动采集系统-Windows.zip`，解压后双击即可运行。
+- 本地打包命令：
+  ```bash
+  pip install -r requirements.txt
+  pyinstaller --clean build_exe.spec
+  ```
+  生成的可执行文件位于 `dist/` 目录下。
+
